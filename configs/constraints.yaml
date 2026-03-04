@@ -1,0 +1,40 @@
+version: 1
+
+decision_window:
+  unit: "day"          # day | hour
+  lookback_days: 7     # how much history to compute rolling workload features
+
+capacity:
+  total_active_cases_per_window: 50   # global capacity per day/hour
+  per_team_active_case_cap: 20        # soft cap for load balancing
+
+time_target:
+  label_column: "met_time_target"     # derived from made_sla
+  late_cost: 5.0                      # penalty weight for finishing late
+
+handoffs:
+  max_reassignments_soft: 2           # beyond this, penalty grows
+  penalty_weight: 1.0                 # discourages too many reassignments
+
+routing:
+  strategy: "learned_allowed_routes"  # learned_allowed_routes | open_routing
+  min_historical_support: 20          # only trust routes with enough history
+  coverage_threshold: 0.80            # keep top routes per category until 80% coverage
+
+escalation:
+  enabled: true
+  risk_threshold: 0.70                # if predicted late-risk > threshold -> recommend escalate
+  min_age_hours: 4                    # don't escalate immediately after opening
+
+fairness:
+  enabled: true
+  overload_penalty_weight: 1.0        # penalize sending too many cases to one team
+  balance_metric: "active_cases"      # active_cases | new_cases
+
+guardrails:
+  prevent_future_leakage: true
+  forbid_outcome_fields:
+    - "resolved_at"
+    - "closed_at"
+    - "close_code"
+    - "resolved_by"

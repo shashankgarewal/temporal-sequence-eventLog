@@ -1,0 +1,62 @@
+version: 1
+
+missing_values:
+  token: "?"
+  meaning: "unknown information"
+
+parsing:
+  timestamp_day_first: true
+  event_order:
+    primary: update_timestamp
+    tie_breaker: system_update_count
+
+raw_to_canonical:
+  number: case_id
+  incident_state: case_status
+  active: is_open
+  reassignment_count: reassigment_total
+  reopen_counts_mod_count_total: system_update_count
+  made_sla: met_deadline
+
+  caller_id: affected_user_id
+  opened_by: reporter_user_id
+  opened_at: opened_timestamp
+  sys_created_by: creator_agent_id
+  sys_created_at: creator_timestamp
+  sys_updated_by: update_agent_id
+  sys_updated_at: update_timestamp
+
+  contact_type: contact_channel
+  location: location_id
+  category: categoryw
+  subcategory: subcategory
+  u_symptom: issue_type_id
+  cmdb_ci: asset_id
+
+  impact: impact_level
+  urgency: urgency_level
+  priority: computed_priority_level
+
+  assignment_group: assigned_team_id
+  assigned_to: assigned_agent_id
+  knowledge: used_knowledge_base
+  u_priority_confirmation: priority_confirmed
+  notify: notify_email
+  problem_id: issue_id
+  rfc: change_request_id
+
+  vendor: vendor_id
+  caused_by: caused_by_ref_id
+  closed_code: resolution_id
+  resolved_by: resolved_by_agent_id
+  resolved_at: resolved_timestamp
+  closed_at: closed_timestamp
+
+guardrails:
+  forbid_as_features:
+    - resolved_timestamp
+    - closed_timestamp
+    - resolution_id
+    - resolved_by_agent_id
+    - reassigment_total
+    - reopen_total
