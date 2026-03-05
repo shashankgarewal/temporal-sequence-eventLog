@@ -4,7 +4,7 @@ import yaml
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-RAW  = ROOT / "data/raw/uci_itsm.csv"
+RAW  = ROOT / "data/raw/incident_event_log.csv"
 OUT  = ROOT / "data/staging/snapshots.parquet"
 SCHEMA = ROOT / "configs/schema.yaml"
 
@@ -37,11 +37,16 @@ def main():
     vendor_col_name = schema_col.get("vendor", "")
     if vendor_col_name in df.columns:
         df[vendor_col_name] = df[vendor_col_name].replace({"code 8s": "Vendor Code8s"})
+        
+    # notify email to boolean 
+    notify_email_col = schema_col.get("notify", "")
+    if notify_email_col in df.columns:
+        df[notify_email_col] = (df[notify_email_col] == 'Send Email').astype("boolean")
 
     # Save
     Path(OUT).parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(OUT, index=False)
-    print(f"✅ staging saved -> {OUT}")
+    print(f"staging saved at: {OUT}")
 
 if __name__ == "__main__":
     main()
