@@ -1,4 +1,4 @@
-version: 1
+version: 2
 
 missing_values:
   token: "?"
@@ -14,8 +14,9 @@ raw_to_canonical:
   number: case_id
   incident_state: case_status
   active: is_open
-  reassignment_count: reassigment_total
-  reopen_counts_mod_count_total: system_update_count
+  reassignment_count: reassignment_total
+  reopen_count : reopen_total
+  sys_mod_count : system_update_count
   made_sla: met_deadline
 
   caller_id: affected_user_id
@@ -28,7 +29,7 @@ raw_to_canonical:
 
   contact_type: contact_channel
   location: location_id
-  category: categoryw
+  category: category
   subcategory: subcategory
   u_symptom: issue_type_id
   cmdb_ci: asset_id
@@ -47,10 +48,17 @@ raw_to_canonical:
 
   vendor: vendor_id
   caused_by: caused_by_ref_id
-  closed_code: resolution_id
+  close_code: resolution_id
   resolved_by: resolved_by_agent_id
   resolved_at: resolved_timestamp
   closed_at: closed_timestamp
+
+timestamp_cols: 
+  - opened_timestamp
+  - creator_timestamp
+  - update_timestamp
+  - resolved_timestamp
+  - closed_timestamp
 
 guardrails:
   forbid_as_features:
@@ -58,5 +66,5 @@ guardrails:
     - closed_timestamp
     - resolution_id
     - resolved_by_agent_id
-    - reassigment_total
+    - reassignment_total
     - reopen_total
