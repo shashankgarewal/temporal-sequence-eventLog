@@ -21,3 +21,7 @@ Each case (case_id) appears multiple times — each row is one recorded update a
 
 * (future scope) `time-to-finish`: duration from `opened_timestamp` to `closed_timestamp` (or `resolved_timestamp`)
 
+
+## License
+- **Code:** MIT (see `LICENSE`)
+- **Dataset:** CC BY 4.0 — see `CITATION.md` for attribution and source.
