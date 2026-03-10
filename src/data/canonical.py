@@ -3,12 +3,15 @@ import numpy as np
 import yaml
 from pathlib import Path
 import warnings
+from sklearn.metrics import normalized_mutual_info_score as nmi_scorer
 warnings.filterwarnings('ignore')
 
 ROOT    = Path(__file__).resolve().parents[2]
 IN      = ROOT / "data/staging/snapshots.parquet"
 OUT     = ROOT / "data/canonical/events.parquet"
 OUT.parent.mkdir(parents=True, exist_ok=True)
+
+NMI_THRESHOLD = 0.6 # used for filling missing assignment group
 
 ##--------------------------- load data -------------------------------##
 df      = pd.read_parquet(IN)
@@ -30,7 +33,7 @@ anomaly_flag            = df['updated_at'] < df['opened_at']
 ### impute opened_at with 75% diff of created_at
 df['diff_p75']          = df['reported_by_uid'].map(diff_p75)
 df.loc[anomaly_flag, 
-       'opened_at']     = df.loc[anomaly_flag, 'created_at'] - df.loc[anomaly_flag, 'p75']
+       'opened_at']     = df.loc[anomaly_flag, 'created_at'] - df.loc[anomaly_flag, 'diff_p75']
 
 df.drop(columns='diff_p75', inplace=True) 
 
@@ -110,32 +113,57 @@ df['subcategory_id']           = df.groupby('case_id')['subcategory_id'].transfo
 ## ---------------------------- reported_by_uid feature --------------------------------------##
 
 ### created_by_uid values that NEVER appear alongside a valid reported_by_uid
-system_accounts = set(
-    df[df['reported_by_uid'].isna()]['created_by_uid'].dropna()
-) - set(
-    df[df['reported_by_uid'].notna()]['created_by_uid'].dropna()
-)
+system_accounts         = (set(df[df['reported_by_uid'].isna()]['created_by_uid'].dropna()) 
+                           - set(df[df['reported_by_uid'].notna()]['created_by_uid'].dropna()))
 
 ### Extract number from 'Created by X' map to 'Opened by Xs'
-sys_mapping = {
-    acc: f"Opened by {acc.split()[-1]}s" 
-    for acc in system_accounts
-}
+sys_mapping             = {acc: f"Opened by {acc.split()[-1]}s" for acc in system_accounts}
 
 ### copy and mask where reported_by_uid is null
-result = df['reported_by_uid'].copy()
-null_mask = result.isna()
+result                  = df['reported_by_uid'].copy()
+null_mask               = result.isna()
 
 ### fill system accounts
-result[null_mask] = df.loc[null_mask, 'created_by_uid'].map(sys_mapping)
-df['reported_by_uid'] = result
+result[null_mask]       = df.loc[null_mask, 'created_by_uid'].map(sys_mapping)
+df['reported_by_uid']   = result
 
 df.drop(['created_by_uid'], axis=1, inplace=True) # prevent multi-collinearity and even for business/human its just redundant.
 
-##-----------------------------
 
-## ---------------------------- fill left out with UNKNOWN
-for col in ['category_id', 'subcategory_id', 'reported_symptom']:
-    if col in df.columns:
-        df[col] = df[col].fillna('Unknown')
+##----------------------------- fill assigned_team_gid -----------------------------------------##
 
+agent_cols          = ['assigned_uid', 'resolved_by_uid', 'updated_by_uid']
+
+# NMI per (status, col)
+nmi_scores          = {status: {col: nmi_scorer(df.loc[mask, 'assigned_team_gid'], 
+                                                df.loc[mask, col]) if (mask := (df['case_status'] == status) 
+                                                                        & df['assigned_team_gid'].notna() 
+                                                                        & df[col].notna()).sum() >= 10 
+                                                                    else 0.0 for col in agent_cols} 
+                       for status in df['case_status'].unique()}
+
+# drop cols that are below threshold across ALL statuses — globally useless
+useful_cols         = [col for col in agent_cols if max(nmi_scores[s][col] 
+                                                        for s in nmi_scores) >= NMI_THRESHOLD]
+
+# lookup per useful col
+lookups             = {col: df[df['assigned_team_gid'].notna() 
+                               & df[col].notna()].groupby(col)['assigned_team_gid'].agg(lambda x: x.mode()[0]) 
+                       for col in useful_cols}
+
+# Vectorized status-aware fill
+result              = df['assigned_team_gid'].copy()
+
+for status in df['case_status'].unique():
+    sorted_cols = sorted(useful_cols, key=lambda c: nmi_scores[status][c], reverse=True)
+    for col in sorted_cols:
+        if nmi_scores[status][col] < NMI_THRESHOLD:
+            continue
+        still_null = result.isna() & (df['case_status'] == status)
+        result.loc[still_null] = df.loc[still_null, col].map(lookups[col])
+
+df['assigned_team_gid'] = result
+
+# save
+df.to_parquet(OUT, index=False)
+print(f"canonical saved at: {OUT.relative_to(ROOT)}")
