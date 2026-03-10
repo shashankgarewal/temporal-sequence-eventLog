@@ -22,8 +22,7 @@ def main():
 
     # Parse datetimes (day-first)
     dayfirst = schema.get("parsing", {}).get("timestamp_day_first", True)
-    for c in ["opened_timestamp", "creator_timestamp", "update_timestamp", 
-              "resolved_timestamp", "closed_timestamp"]:
+    for c in schema.get("timestamp_cols"):
         if c in df.columns:
             df[c] = pd.to_datetime(df[c], errors="coerce", dayfirst=dayfirst)
 
@@ -46,7 +45,7 @@ def main():
     # Save
     Path(OUT).parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(OUT, index=False)
-    print(f"staging saved at: {OUT}")
+    print(f"staging saved at: {OUT.relative_to(ROOT)}")
 
 if __name__ == "__main__":
     main()
