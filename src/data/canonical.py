@@ -6,10 +6,16 @@ import warnings
 from sklearn.metrics import normalized_mutual_info_score as nmi_scorer
 warnings.filterwarnings('ignore')
 
-ROOT    = Path(__file__).resolve().parents[2]
-IN      = ROOT / "data/staging/snapshots.parquet"
-OUT     = ROOT / "data/canonical/events.parquet"
-OUT.parent.mkdir(parents=True, exist_ok=True)
+ROOT        = Path(__file__).resolve().parents[2]
+IN          = ROOT / "data/staging/snapshots.parquet"
+OUT_EVENTS  = ROOT / "data/canonical/events.parquet"
+OUT_CASES   = ROOT / "data/canonical/cases.parquet"
+SCHEMA      = ROOT / "configs/schema.yaml"
+
+OUT_EVENTS.parent.mkdir(parents=True, exist_ok=True)
+OUT_CASES.parent.mkdir(parents=True, exist_ok=True)
+
+schema = yaml.safe_load(open(SCHEMA, "r", encoding="utf-8"))
 
 NMI_THRESHOLD = 0.6 # used for filling missing assignment group
 
@@ -17,6 +23,7 @@ NMI_THRESHOLD = 0.6 # used for filling missing assignment group
 df      = pd.read_parquet(IN)
 df      = df.sort_values(['case_id', 'updated_at', 'system_update_count'], 
                          kind='mergesort')
+waiting_status  = schema['waiting_status']
 
 
 ##---------------------- fix anomaly in opened_at -------------------------##
@@ -136,10 +143,11 @@ agent_cols          = ['assigned_uid', 'resolved_by_uid', 'updated_by_uid']
 
 # NMI per (status, col)
 nmi_scores          = {status: {col: nmi_scorer(df.loc[mask, 'assigned_team_gid'], 
-                                                df.loc[mask, col]) if (mask := (df['case_status'] == status) 
-                                                                        & df['assigned_team_gid'].notna() 
-                                                                        & df[col].notna()).sum() >= 10 
-                                                                    else 0.0 for col in agent_cols} 
+                                                df.loc[mask, col]) 
+                                if (mask := (df['case_status'] == status) 
+                                    & df['assigned_team_gid'].notna() 
+                                    & df[col].notna()).sum() >= 10 
+                                else 0.0 for col in agent_cols} 
                        for status in df['case_status'].unique()}
 
 # drop cols that are below threshold across ALL statuses — globally useless
@@ -164,6 +172,54 @@ for status in df['case_status'].unique():
 
 df['assigned_team_gid'] = result
 
+## ----------------------- new features ---------------------------------- ##
+df['time_taken'] = df.groupby('case_id')['updated_at'].diff(1)
+df['time_taken']        = df['time_taken'].fillna((df['updated_at'] - df['opened_at']))
+df['time_taken']        = df['time_taken'].dt.total_seconds() / (60*60)
+
+df['active_work_hours'] = df['time_to_next_event_hours']
+
+df.loc[df['case_status'].isin(waiting_status), 'active_work_hours'] = 0
+
 # save
-df.to_parquet(OUT, index=False)
-print(f"canonical saved at: {OUT.relative_to(ROOT)}")
+df.to_parquet(OUT_EVENTS, index=False)
+print(f"canonical saved at: {OUT_EVENTS.relative_to(ROOT)}")
+
+
+
+## --------------------- ### build cases table ### ----------------------- ##
+
+# ensure sorted
+df              = df.sort_values(['case_id','updated_at','system_update_count'])
+
+# first and last events
+first_events    = df.groupby('case_id').first()
+last_events     = df.groupby('case_id').last()
+
+cases = pd.DataFrame({
+    
+    "case_id"              : first_events.index,
+    "finally_met_deadline" : last_events["met_deadline"],
+    
+    "opened_at"            : first_events["opened_at"],
+    "created_at"           : first_events["created_at_proxy"],
+    
+    "resolved_at"          : last_events["resolved_at"],
+    "closed_at"            : last_events["closed_at"],
+    
+    "location_id"          : first_events["location_id"],
+    "category_id"          : first_events["category_id"],
+    "subcategory_id"       : first_events["subcategory_id"],
+    
+})
+
+cases.reset_index(drop=True, inplace=True)
+
+cases["duration_in_hours"]  = ((cases["closed_at"] - cases["opened_at"])
+                              .dt.total_seconds() / 3600
+                              )
+
+cases["only_active_hours"]  = (df.groupby("case_id")["active_work_hours"].sum().values)
+
+cases.to_parquet(OUT_CASES, index=False)
+print(f"cases saved at: {OUT_CASES.relative_to(ROOT)}")
