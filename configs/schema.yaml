@@ -14,57 +14,67 @@ raw_to_canonical:
   number: case_id
   incident_state: case_status
   active: is_open
-  reassignment_count: reassignment_total
-  reopen_count : reopen_total
+  reassignment_count: reassignment_count
+  reopen_count : reopen_count
   sys_mod_count : system_update_count
   made_sla: met_deadline
 
-  caller_id: affected_user_id
-  opened_by: reporter_user_id
-  opened_at: opened_timestamp
-  sys_created_by: creator_agent_id
-  sys_created_at: creator_timestamp
-  sys_updated_by: update_agent_id
-  sys_updated_at: update_timestamp
+  caller_id: affected_uid   # end-user who is facing the issue
+  opened_by: reported_by_uid   # user who reported the issue, It is a reference* (Meaning can be null, when deleted) ex: opened by = Assistant , caller = CEO {https://www.servicenow.com/community/itsm-forum/what-is-the-difference-between-the-caller-vs-on-behalf-of-for-an/m-p/635097#:~:text=opened%20by%20%3D%C2%A0Assistant%20%2C%C2%A0caller%20%3D%20CEO}
+  sys_created_by: created_by_uid   # (absolute) string value for opened_by {https://www.servicenow.com/community/developer-forum/value-of-opened-by-is-not-matching-created-by/td-p/2966044/page/2} {https://www.reddit.com/r/servicenow/comments/e93p8r/opened_by_vs_created_by}
+  sys_updated_by: updated_by_uid   # string value of the user/agent/system updated the case
+
+  opened_at: opened_at   # when form/call is initiated by reporter_user. 
+  sys_created_at: created_at
+  sys_updated_at: updated_at
 
   contact_type: contact_channel
-  location: location_id
-  category: category
-  subcategory: subcategory
-  u_symptom: issue_type_id
-  cmdb_ci: asset_id
+  location: location_id # location of caller_id, nan when user record doesn't have location {https://support.servicenow.com/kb?id=kb_article_view&sysparm_article=KB0859575}
+  category: category_id
+  subcategory: subcategory_id
+  cmdb_ci: asset_id # identifier for asset, many informaiton like health are stored in database with cmdb_ci as primary key
 
-  impact: impact_level
-  urgency: urgency_level
-  priority: computed_priority_level
+  impact: impact_level # decided by IT service desk
+  urgency: urgency_level # given/set by end-user
+  priority: priority_level # servicenow system compute
 
-  assignment_group: assigned_team_id
-  assigned_to: assigned_agent_id
   knowledge: used_knowledge_base
-  u_priority_confirmation: priority_confirmed
-  notify: notify_email
-  problem_id: issue_id
-  rfc: change_request_id
+  notify: notify_email # the published dataset only contain notify email or don't notify
 
-  vendor: vendor_id
-  caused_by: caused_by_ref_id
-  close_code: resolution_id
-  resolved_by: resolved_by_agent_id
-  resolved_at: resolved_timestamp
-  closed_at: closed_timestamp
+  # custom fields, not available in OOTB servicenow incident management
+  u_priority_confirmation: priority_confirmed # [description of the user perception about service availability;] ~ did agent checked/seen the priority when assessing the incident
+  u_symptom: reported_symptom # [description of the user perception about service availability] ~ seems like servicenow desription (short-description) content
+  vendor: vendor_id # [identifier of the vendor in charge of the incident] ~ agency/vendor responsible to resolve the incident.
+
+  problem_id: root_cause_id # known problem id related to the incident/case in records
+  rfc: change_request_id # change request has been logged to resolve the incident
+  caused_by: caused_by_change_id # incident is a consequence of IT infra change => links an incident to the Configuration Item (CI) or service that caused the issue. 
+
+  assignment_group: assigned_team_gid
+  assigned_to: assigned_uid # not mandatory field
+  resolved_by: resolved_by_uid # not mandatory field
+  
+  closed_code: resolution_id # resolution (solution/workaround/etc) provide selected from the available/limited dropdown.
+  resolved_at: resolved_at # auto-filled if left empty {https://youtu.be/ZezT9HLIv7E?t=1566}
+  closed_at: closed_at # auto-filled if left empty
 
 timestamp_cols: 
-  - opened_timestamp
-  - creator_timestamp
-  - update_timestamp
-  - resolved_timestamp
-  - closed_timestamp
+  - opened_at
+  - created_at
+  - updated_at
+  - resolved_at
+  - closed_at
+
+waiting_status:
+  - Awaiting User Info
+  - Awaiting Problem
+  - Awaiting Vendor
+  - Awaiting Evidence
+        
 
 guardrails:
   forbid_as_features:
-    - resolved_timestamp
-    - closed_timestamp
+    - resolved_at
+    - closed_at
     - resolution_id
-    - resolved_by_agent_id
-    - reassignment_total
-    - reopen_total
+    - resolved_by_uid
