@@ -65,16 +65,6 @@ reamining_mask          = df['resolved_at'].isna()
 df.loc[reamining_mask, 
        'resolved_at']   = df.loc[reamining_mask, 'closed_at'] # cases without Resolved status
 
-
-## ----------------------- fill missing created_at ---------------------------##
-
-### for simulation only
-df['created_at_missing_flag']   = df['created_at'].isna().astype('int8')
-
-### for modeling and simulation
-df['created_at_proxy']          = df['created_at'].combine_first(df['opened_at'])
-
-
 ## -------------------------fix & fill location_id-----------------------------##
 
 ### fill nan record with location_id in case if available
@@ -173,17 +163,18 @@ for status in df['case_status'].unique():
 df['assigned_team_gid'] = result
 
 ## ----------------------- new features ---------------------------------- ##
-df['time_taken'] = df.groupby('case_id')['updated_at'].diff(1)
-df['time_taken']        = df['time_taken'].fillna((df['updated_at'] - df['opened_at']))
-df['time_taken']        = df['time_taken'].dt.total_seconds() / (60*60)
+df['time_since_last_update']        = df.groupby('case_id')['updated_at'].diff(1)
+df['time_since_last_update']        = df['time_since_last_update'].fillna((df['updated_at'] - df['opened_at']))
+df['time_since_last_update']        = df['time_since_last_update'].dt.total_seconds() / (60*60)
 
-df['active_work_hours'] = df['time_to_next_event_hours']
-
-df.loc[df['case_status'].isin(waiting_status), 'active_work_hours'] = 0
+df['active_hours']                  = df['time_since_last_update']
+df.loc[df['case_status']
+       .isin(waiting_status), 
+       'active_work_hours']         = 0
 
 # save
 df.to_parquet(OUT_EVENTS, index=False)
-print(f"canonical saved at: {OUT_EVENTS.relative_to(ROOT)}")
+print(f"events saved at: {OUT_EVENTS.relative_to(ROOT)}")
 
 
 
@@ -202,7 +193,7 @@ cases = pd.DataFrame({
     "finally_met_deadline" : last_events["met_deadline"],
     
     "opened_at"            : first_events["opened_at"],
-    "created_at"           : first_events["created_at_proxy"],
+    "created_at"           : first_events["created_at"],
     
     "resolved_at"          : last_events["resolved_at"],
     "closed_at"            : last_events["closed_at"],
@@ -219,7 +210,7 @@ cases["duration_in_hours"]  = ((cases["closed_at"] - cases["opened_at"])
                               .dt.total_seconds() / 3600
                               )
 
-cases["only_active_hours"]  = (df.groupby("case_id")["active_work_hours"].sum().values)
+cases["active_hours"]  = (df.groupby("case_id")["active_work_hours"].sum().values)
 
 cases.to_parquet(OUT_CASES, index=False)
 print(f"cases saved at: {OUT_CASES.relative_to(ROOT)}")
