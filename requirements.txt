@@ -1,0 +1,8 @@
+mlflow
+mlflow_skinny
+mlflow_tracing
+numpy
+pandas
+PyYAML
+PyYAML
+scikit_learn
