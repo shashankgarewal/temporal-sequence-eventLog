@@ -20,22 +20,46 @@ schema = yaml.safe_load(open(SCHEMA, "r", encoding="utf-8"))
 NMI_THRESHOLD = 0.6 # used for filling missing assignment group
 
 ##--------------------------- load data -------------------------------##
-df      = pd.read_parquet(IN)
-df      = df.sort_values(['case_id', 'updated_at', 'system_update_count'], 
-                         kind='mergesort')
-waiting_status  = schema['waiting_status']
+df                   = pd.read_parquet(IN)
+df                   = df.sort_values(['case_id', 'updated_at', 'system_update_count'], 
+                                      kind='mergesort')
+waiting_status       = schema['waiting_status']
+grp                  = df.groupby('case_id')
+
+# ------------------------------ fill created_at ----------------------------- #
+# from notebook analysis -> created_at is missing for all case events/entries when missing. 
+
+# when case status is new, the action would be create case 
+#      -> implying updated_at time is the time case created
+result                      = grp.first().query('case_status == "New" and \
+                                                 created_at.isna()')['updated_at'].to_dict()
+flag                        = df['case_id'].isin(result.keys())
+df.loc[flag, 
+       'created_at']        = df.loc[flag, 'case_id'].map(result)
+
+# when case open and update time is same -> create time is same
+result                      = df.query('opened_at == updated_at and created_at.isna()') \
+                                          .groupby(df['case_id']) \
+                                          .first()['opened_at'].to_dict()
+flag                        = df['case_id'].isin(result.keys())
+df.loc[flag, 
+       'created_at']        = df.loc[flag, 'case_id'].map(result)
+
+# captures the impute pattern - may come relavant in discussion with stakeholders+data-science team
+df['created_at_is_imputed'] = flag
 
 
 ##---------------------- fix anomaly in opened_at -------------------------##
 
+### flag impossible (anomaly) in opened_at
+anomaly_flag            = df['created_at'] < df['opened_at'] 
+
 ###  75% of diff between opened_at and created_at
-diff_p75                = (df[df['updated_at'] > df['opened_at']]
+diff_p75                = (df[~anomaly_flag]
                            .groupby('reported_by_uid')
                            .apply(lambda x: (x['created_at'] - x['opened_at'])
                                   .quantile(0.75))
                            )
-### flag impossible (anomaly) in opened_at
-anomaly_flag            = df['updated_at'] < df['opened_at']
 
 ### impute opened_at with 75% diff of created_at
 df['diff_p75']          = df['reported_by_uid'].map(diff_p75)
@@ -98,8 +122,20 @@ loc_nunique_users           = (df.groupby('location_id')['affected_uid']
                                .loc[nan_user_location] # fiter out locations with nan user
                                )
 #### logic - single location links to single user in my dataset => assumes that's valid across population
-valid_impute_loc             = (loc_nunique_users == 1)
+valid_impute_loc            = (loc_nunique_users == 1)
 
+### fix changing affected_uid cases
+varying_cases               = (df.groupby('case_id')['affected_uid'].nunique(dropna=True))
+suspicious_case_flag        = varying_cases[varying_cases > 1].index
+suspicious_modes            = (df[df['case_id'].isin(suspicious_case_flag)]
+                               .groupby('case_id')['affected_uid']
+                               .apply(lambda x: x.mode().iloc[0] 
+                                      if not x.mode().empty else np.nan
+                                      )
+                               )
+mask                        = df['case_id'].isin(suspicious_case_flag)
+df.loc[mask, 
+       'affected_uid']      = df['case_id'].map(suspicious_modes)
 
 ## ------------------------ category and sub category features ------------------------------##
 
@@ -163,14 +199,14 @@ for status in df['case_status'].unique():
 df['assigned_team_gid'] = result
 
 ## ----------------------- new features ---------------------------------- ##
-df['time_since_last_update']        = df.groupby('case_id')['updated_at'].diff(1)
-df['time_since_last_update']        = df['time_since_last_update'].fillna((df['updated_at'] - df['opened_at']))
-df['time_since_last_update']        = df['time_since_last_update'].dt.total_seconds() / (60*60)
+df['time_since_last_update']       = df.groupby('case_id')['updated_at'].diff(1)
+df['time_since_last_update']       = df['time_since_last_update'].fillna((df['updated_at'] - df['opened_at']))
+df['time_since_last_update']       = df['time_since_last_update'].dt.total_seconds() / (60*60)
 
-df['active_hours']                  = df['time_since_last_update']
+df['active_work_hours']            = df['time_since_last_update']
 df.loc[df['case_status']
        .isin(waiting_status), 
-       'active_work_hours']         = 0
+       'active_work_hours']        = 0
 
 # save
 df.to_parquet(OUT_EVENTS, index=False)

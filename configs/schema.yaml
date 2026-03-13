@@ -70,6 +70,7 @@ waiting_status:
   - Awaiting Problem
   - Awaiting Vendor
   - Awaiting Evidence
+  - Closed
         
 
 guardrails:
