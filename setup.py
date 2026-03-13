@@ -19,10 +19,12 @@ def get_requirements(file_path: str) -> List[str]:
     return requirements
 
 setup(
-    name                = 'eventlogs',
-    version             = '0.1.0',
-    author              = 'shashankgarewal',
-    author_email        = 'shashankgarewal4+github@gmail.com',
-    packages            = find_packages(),
-    install_requires    = get_requirements('requirements.txt')
+    name                    = 'eventlogs',
+    version                 = '0.1.0',
+    author                  = 'shashankgarewal',
+    author_email            = 'shashankgarewal4+github@gmail.com',
+    packages                = find_packages(),
+    install_requires        = get_requirements('requirements.txt'),
+    package_data            = {'': ['.root']},
+    include_package_data    = True
 )
