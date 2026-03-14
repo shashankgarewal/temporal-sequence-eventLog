@@ -1,0 +1,47 @@
+sparse:
+  description: most (~99%) data missing
+  columns:
+    - caused_by_change_id
+    - change_request_id
+    - root_cause_id
+    - vendor_id
+    - asset_id
+
+constants:
+  description: value does not change within a case
+  columns:
+    - affected_uid
+    - reported_by_uid
+    - opened_at
+    - created_at
+    - location_id
+    - notify_email
+    - vendor_id
+    - caused_by_change_id
+    - resolution_id
+    - resolved_by_uid
+    - resolved_at
+    - closed_at
+    - created_at_is_imputed
+
+sequence:
+  description: value that changes over events of a case
+  columns:
+
+
+temporal:
+  columns:
+    - opened_at
+    - created_at
+    - updated_at
+    - resolved_at
+    - closed_at
+
+user_id:
+  - affected_uid
+  - reported_by_uid
+  - updated_by_uid
+  - resolved_by_uid
+
+iteraction:
+  - active_work_hours
