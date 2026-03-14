@@ -26,6 +26,14 @@ def make_constant(df: pd.DataFrame, grp_case, col: str) -> pd.Series:
     """
     return grp_case[col].transform('first')
 
+def drop_few_missing(df, threshold:int = 10):
+    """function to drop entries where field missing"""
+    missing_count = df.isna().groupby(df['case_id']).all().sum()
+    feature_names = missing_count[(missing_count > 0) & (missing_count < threshold)].index.tolist()
+    
+    return df.dropna(subset=[feature_names])
+    
+    
 def build_base_table(events_path: str = r'data\canonical\events.parquet', 
                      mbt_path: str = r'data\base_table\mbt.parquet'):
     """function to create modeling ready base table
@@ -43,8 +51,10 @@ def build_base_table(events_path: str = r'data\canonical\events.parquet',
     for feature in profile.get('sparse'):
         df[f'{feature[:-2]}missing_flag']= build_flag(df[feature])
         
-    # ------------------------------ contact_channel ----------------------------- #
-    make_constant(grp_case,'contact_channel')
+    df['contact_channel'] = make_constant(grp_case,'contact_channel')
     
+    df['used_knowledgebase']
+    
+    df = drop_few_missing(df)
     print(f"saved modeling base table: {mbt_path}")
     return df
