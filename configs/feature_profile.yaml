@@ -45,3 +45,14 @@ user_id:
 
 iteraction:
   - active_work_hours
+
+minor_change:
+  description: showed genuine minior shifting within cases; more 95% cases remained constant
+  - used_knowledge_base
+  - reopen_count
+  - urgency_level
+  - impact_level
+  - priority_level
+  - category_id
+  - reported_symptom
+  - subcategory_id
