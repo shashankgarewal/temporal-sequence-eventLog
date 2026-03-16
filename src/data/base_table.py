@@ -55,6 +55,11 @@ def build_base_table(events_path: str = r'data\canonical\events.parquet',
     profile = load('configs/feature_profile.yaml')
     tags = tag_feature_map(profile)
     
+    # preserve outcome variable from imputation
+    outcome_cols = valid_cols(tags['guardrail'], df)
+    outcome_df = df[outcome_cols]
+    df = df.drop(outcome_cols, axis=1)
+    
     # highly-missing feature (99% missing)
     sparse_cols = valid_cols(tags['sparse'], df)
     df[add_suffix(sparse_cols, "pflag")] = build_flag(df[sparse_cols], 
@@ -87,6 +92,11 @@ def build_base_table(events_path: str = r'data\canonical\events.parquet',
     oridinal_cols = valid_cols(tags['ordinal'], df)
     df[add_suffix(oridinal_cols, "encoded", trim=5)] = apply_mappings(df, oridinal_cols, profile)
     df = df.drop(oridinal_cols, axis=1)
+    
+    # bool feature to binary
+    bool_cols = valid_cols(tags['boolean'], df)
+    df[bool_cols] = df[bool_cols].astype(int) # True: 1, False: 0
+    
     
     
     print(f"saved modeling base table: {mbt_path}")
