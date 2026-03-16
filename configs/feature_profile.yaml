@@ -1,3 +1,181 @@
+columns:
+
+  # ----------------------- Sparse columns (~99% missing) ---------------------- #
+  caused_by_change_id:
+    tags: [sparse, case_constant, categorical]
+    note: incident caused by an infra change; nearly always null
+
+  change_request_id:
+    tags: [sparse, case_constant, categorical]
+    note: RFC logged to resolve; nearly always null
+
+  root_cause_id:
+    tags: [sparse, case_constant, categorical]
+    note: linked problem record; 9 mid-case changes confirmed as noise
+
+  vendor_id:
+    tags: [sparse, case_constant, categorical]
+    note: responsible agency/vendor; nearly always null
+
+  asset_id:
+    tags: [sparse, case_constant, categorical]
+    note: CMDB CI reference; 1 mid-case change confirmed as noise
+
+  # ------------------------------ Case constants ------------------------------ #
+  affected_uid:
+    tags: [case_constant, categorical, user_scale, uid, high_cardinality, minor_missing]
+    note: ~5244 unique; derive freq-encoding or drop raw
+
+  reported_by_uid:
+    tags: [case_constant, categorical, agent_scale, uid, structural_null]
+    note: 208 unique; 251 nulls due to deleted user references; fill Unknown
+
+  opened_at:
+    tags: [case_constant, temporal]
+    note: 5 cases showed variance; confirmed as import/backfill errors
+
+  created_at:
+    tags: [case_constant, temporal]
+    note: sys_created_at canonical equivalent; imputation flag exists
+
+  created_at_is_imputed:
+    tags: [case_constant, boolean, derived]
+
+  location_id:
+    tags: [case_constant, categorical, structural_null, minor_missing]
+    note: 6 nulls when user record has no location set
+
+  notify_email:
+    tags: [case_constant, boolean]
+    note: only two values in published dataset; no missing
+
+  # --------------------------------- Temporal --------------------------------- #
+  updated_at:
+    tags: [event_level, temporal]
+    note: primary sort key for event ordering
+
+  resolved_at:
+    tags: [case_constant, temporal, lifecycle_null, guardrail]
+    note: auto-filled by system; forbidden as feature (leakage)
+
+  closed_at:
+    tags: [case_constant, temporal, lifecycle_null, guardrail]
+    note: auto-filled by system; forbidden as feature (leakage)
+
+  # --------------------------- User & agent identity fields --------------------------- #
+  resolved_by_uid:
+    tags: [case_constant, categorical, agent_scale, uid, lifecycle_null, guardrail]
+    note: 215 unique; null until resolved; forbidden as feature (leakage)
+
+  resolution_id:
+    tags: [case_constant, categorical, lifecycle_null, guardrail]
+    note: dropdown at resolution; forbidden as feature (leakage)
+
+  updated_by_uid:
+    tags: [event_level, categorical, mixed_scale]
+  # ------------------------ Lifecycle-null agent fields ----------------------- #
+    note: 846 unique; mix of human agents and system accounts; needs threshold-based split
+
+  # ── Minor-change columns (<5% cases vary) ──────────────────────
+  used_knowledge_base:
+    tags: [minor_change, boolean, system_behavior]
+    note: True→False at resolution in all 208 varying cases; take first value
+
+  urgency_level:
+    tags: [minor_change, categorical, ordinal]
+    note: set by end-user; 299 cases changed; inspect directionality
+
+  impact_level:
+    tags: [minor_change, categorical, ordinal]
+    note: set by IT service desk; 315 cases changed
+
+  priority_level:
+    tags: [minor_change, categorical, ordinal, system_computed]
+    note: computed by ServiceNow from urgency+impact; round-trip changes observed
+
+  category_id:
+    tags: [minor_change, categorical, minor_missing]
+    note: 1184 cases changed; moderate cardinality
+
+  subcategory_id:
+    tags: [minor_change, categorical, minor_missing]
+    note: 1737 cases changed; child of category_id
+
+  reported_symptom:
+    tags: [minor_change, categorical, high_cardinality, structural_null]
+    note: 5513 cases always null; ffill within case then Unknown; add missing_flag
+
+  reported_symptom_missing_flag:
+    tags: [derived, boolean, event_level]
+    note: flag before ffill; captures when symptom first entered the system
+
+  contact_channel:
+    tags: [minor_change, categorical]
+    impute: 'first'
+    note: 5 cases changed (Self service→Phone, Email→Phone); channel escalation signal; take first + add escalation flag
+
+  # ----------------------- Event-level sequence columns ----------------------- #
+  case_status:
+    tags: [event_level, categorical]
+    note: primary state identifier; 100% of cases vary by definition
+
+  is_open:
+    tags: [event_level, boolean]
+    note: derived from case_status; 100% vary
+
+  system_update_count:
+    tags: [event_level, counter, numeric]
+    note: tie-breaker for event ordering; monotonic within case
+
+  reassignment_count:
+    tags: [event_level, counter, numeric]
+    note: increments on both group AND analyst change; resets on reopen; use with reopen_count
+
+  reopen_count:
+    tags: [event_level, counter, numeric]
+    note: reassignment_count resets per reopen cycle
+
+  assigned_team_gid:
+    tags: [event_level, categorical, agent_scale, uid, lifecycle_null, minor_missing]
+    note: uniquely identified by (case_id, reopen_count, reassignment_count); fill via composite key
+
+  assigned_uid:
+    tags: [event_level, categorical, agent_scale, uid, lifecycle_null]
+    note: finer than reassignment_count (analyst swaps within group not counted); fill Unknown for ambiguous rows
+
+  met_deadline:
+    tags: [event_level, boolean, guardrail, target]
+    note: SLA met flag; primary classification target; forbidden as input feature
+
+  priority_confirmed:
+    tags: [event_level, boolean]
+    note: custom field; agent checked priority during assessment
+
+  # ── Numeric interaction / derived ──────────────────────────────
+  caused_by_change_pflag:
+    tags: [flag, binary, minor_change, presense_flag]
+
+  asset_pflag:
+    tags: [flag, binary, minor_change, presense_flag]
+
+  change_request_pflag:
+    tags: [flag, binary, minor_change, presense_flag]
+
+  root_cause_pflag:
+    tags: [flag, binary, minor_change, presense_flag]
+
+  reported_symptom_mflag:
+    tags: [flag, binary, minor_change, missing_flag]
+
+  vendor_pflag:
+    tags: [flag, binary, minor_change, presense_flag]
+
+  active_hours:
+    tags: [event_level, numeric]
+
+  time_since_last_update:
+    tags: [event_level, numeric]
+
 sparse:
   description: most (~99%) data missing
   columns:
@@ -48,11 +226,12 @@ iteraction:
 
 minor_change:
   description: showed genuine minior shifting within cases; more 95% cases remained constant
-  - used_knowledge_base
-  - reopen_count
-  - urgency_level
-  - impact_level
-  - priority_level
-  - category_id
-  - reported_symptom
-  - subcategory_id
+  columns:
+    - used_knowledge_base
+    - reopen_count
+    - urgency_level
+    - impact_level
+    - priority_level
+    - category_id
+    - reported_symptom
+    - subcategory_id
