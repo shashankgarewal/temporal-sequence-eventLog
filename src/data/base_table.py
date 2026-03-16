@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from src.utils.load import load, dump
 from src.utils.data import tag_feature_map, add_suffix, valid_cols
+from typing import Dict, List, Any, Tuple
 
 def build_flag(data: pd.Series | pd.DataFrame, missing_flags: bool = True) -> pd.Series | pd.DataFrame:
     """Create data missing/presence flags of pandas series or dataframe"""
@@ -30,6 +31,14 @@ def fill_missing(df, cols: list | str, keyword: str = "Unknown"):
     if type(cols) is str:
         return df[[cols]].fillna("Unknown")
     return df[cols].fillna("Unknown")
+
+def apply_mappings(df: pd.DataFrame, cols: List[str], profile: Dict[str, Any]) -> pd.DataFrame:
+    """Apply ordinal mappings from profile to given columns, adds encoded cols to df."""
+    for col in cols:
+        mapping = profile["columns"][col].get("mapping")
+        if mapping:
+            return df[col].map(mapping)
+    return
 
 def build_base_table(events_path: str = r'data\canonical\events.parquet', 
                      mbt_path: str = r'data\base_table\mbt.parquet'):
@@ -73,6 +82,12 @@ def build_base_table(events_path: str = r'data\canonical\events.parquet',
                                           - set(tags['flag'])), df) # removed flag as it capture original data
     cproxy_cols = add_suffix(minor_changing_cols, "_cproxy") #constant proxy cols
     df[cproxy_cols] = make_constant(df, minor_changing_cols, "first") # only first can avoid data leakage
+    
+    # ordinal feature encoding
+    oridinal_cols = valid_cols(tags['ordinal'], df)
+    df[add_suffix(oridinal_cols, "encoded", trim=5)] = apply_mappings(df, oridinal_cols, profile)
+    df = df.drop(oridinal_cols, axis=1)
+    
     
     print(f"saved modeling base table: {mbt_path}")
     return df
