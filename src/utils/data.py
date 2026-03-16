@@ -5,7 +5,7 @@ from typing import Dict, List, Any, Tuple
 
 def tag_feature_map(profile: Dict[str, Any]) -> Dict[str, List[str]]:
     """
-        Creates an inverted index mapping tag names to lists of column names.
+        Creates a tag → columns lookup from the column schema profile.
         
         Args:
             profile: A dictionary containing a "columns" key with metadata.
@@ -20,6 +20,18 @@ def tag_feature_map(profile: Dict[str, Any]) -> Dict[str, List[str]]:
             tag_map[tag].append(col)
     return dict(tag_map)
 
-def add_suffix(cols: List[str], suffix: str = "") -> List[str]:
-    """Appends a suffix to a list of column names."""
-    return [f"{col}{suffix}" for col in cols]
+def valid_cols(cols: List[str], df: pd.DataFrame) -> List[str]:
+    """Remove any cols not present in dataframe"""
+    return [c for c in cols if c in set(df.columns)]
+
+def add_suffix(cols: List[str] | str, suffix: str = "", trim:int = 0) -> List[str]:
+    """Trim characters from the end and appends a suffix."""
+    trim = abs(trim)
+    if type(cols) is str:
+        if trim == 0:
+            return (cols + suffix)
+        else:
+            return (cols[:-trim] + suffix)
+    if trim == 0:
+        return [f"{col}{suffix}" for col in cols]
+    return [f"{col[:-trim]}{suffix}" for col in cols]
