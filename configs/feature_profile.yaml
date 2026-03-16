@@ -27,7 +27,7 @@ columns:
     note: ~5244 unique; derive freq-encoding or drop raw
 
   reported_by_uid:
-    tags: [case_constant, categorical, agent_scale, uid, structural_null]
+    tags: [case_constant, categorical, agent_scale, uid, 1pct_null]
     note: 208 unique; 251 nulls due to deleted user references; fill Unknown
 
   opened_at:
@@ -42,7 +42,7 @@ columns:
     tags: [case_constant, boolean, derived]
 
   location_id:
-    tags: [case_constant, categorical, structural_null, minor_missing]
+    tags: [case_constant, categorical, minor_missing]
     note: 6 nulls when user record has no location set
 
   notify_email:
@@ -55,20 +55,20 @@ columns:
     note: primary sort key for event ordering
 
   resolved_at:
-    tags: [case_constant, temporal, lifecycle_null, guardrail]
+    tags: [case_constant, temporal, guardrail]
     note: auto-filled by system; forbidden as feature (leakage)
 
   closed_at:
-    tags: [case_constant, temporal, lifecycle_null, guardrail]
+    tags: [case_constant, temporal, guardrail]
     note: auto-filled by system; forbidden as feature (leakage)
 
   # --------------------------- User & agent identity fields --------------------------- #
   resolved_by_uid:
-    tags: [case_constant, categorical, agent_scale, uid, lifecycle_null, guardrail]
+    tags: [case_constant, categorical, agent_scale, uid, guardrail, 1pct_null]
     note: 215 unique; null until resolved; forbidden as feature (leakage)
 
   resolution_id:
-    tags: [case_constant, categorical, lifecycle_null, guardrail]
+    tags: [case_constant, categorical, guardrail]
     note: dropdown at resolution; forbidden as feature (leakage)
 
   updated_by_uid:
@@ -102,7 +102,7 @@ columns:
     note: 1737 cases changed; child of category_id
 
   reported_symptom:
-    tags: [minor_change, categorical, high_cardinality, structural_null]
+    tags: [minor_change, categorical, high_cardinality, major_null]
     note: 5513 cases always null; ffill within case then Unknown; add missing_flag
 
   reported_symptom_missing_flag:
@@ -136,11 +136,11 @@ columns:
     note: reassignment_count resets per reopen cycle
 
   assigned_team_gid:
-    tags: [event_level, categorical, agent_scale, uid, lifecycle_null, minor_missing]
+    tags: [event_level, categorical, agent_scale, uid, major_null]
     note: uniquely identified by (case_id, reopen_count, reassignment_count); fill via composite key
 
   assigned_uid:
-    tags: [event_level, categorical, agent_scale, uid, lifecycle_null]
+    tags: [event_level, categorical, agent_scale, uid, major_null]
     note: finer than reassignment_count (analyst swaps within group not counted); fill Unknown for ambiguous rows
 
   met_deadline:

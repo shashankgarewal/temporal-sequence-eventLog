@@ -1,61 +1,39 @@
 import pandas as pd
 import numpy as np
-from src.utils.load import load
+from src.utils.load import load, dump
+from src.utils.data import tag_feature_map, add_suffix, valid_cols
 
-def build_flag(series: pd.Series, missing_flags: bool = True) -> pd.Series:
-    """Create data missing/presence flag of pandas series
-
-    Args:
-        series (pd.Series): input pandas Series to evaluate.
-        missing_flags (bool):   True (Defaults) - returns 1 for NaN values.
-                                False           - reutrns 1 for non-NaN values.
-
-    Returns:
-        pd.Series: pandas series with 0/1 int flag
-    """
+def build_flag(data: pd.Series | pd.DataFrame, missing_flags: bool = True) -> pd.Series | pd.DataFrame:
+    """Create data missing/presence flags of pandas series or dataframe"""
     if missing_flags:
-        return series.isna().astype(int)
-    return series.notna().astype(int)
+        return data.isna().astype(int)
+    return data.notna().astype(int)
 
 # features which have changes due to data migraton/sourcing
-def make_constant(df: pd.DataFrame, grp_case, col: str) -> pd.Series:
-    """
-    grp_case: df.groupby("case_id")
-    col: column with case_level changing values 
-    returns: events series with case_level constant value
-    """
-    return grp_case[col].transform('first')
+def make_constant(df, cols: str | list, method = 'first') -> pd.Series:
+    """Create events series with case_level constant value"""
+    if method == 'mode':
+        return df.groupby('case_id')[cols].transform(lambda x: x.mode().iloc[0])
+    return df.groupby('case_id')[cols].transform(method)
 
-def drop_few_missing(df, threshold:int = 10):
-    """function to drop cases where field missing"""
+def drop_missing(df, features):
+    """Drop cases (rows) where field missing"""
     missing_table = df.isna().groupby(df['case_id']).all()
-    missing_count = missing_table.sum(axis=0)
-    feature_names = missing_count[(missing_count > 0) & (missing_count < threshold)].index.tolist()
-    
-    cases_to_drop = missing_table[feature_names].any(axis=1)
+    cases_to_drop = missing_table[features].any(axis=1)
     drop_ids = cases_to_drop[cases_to_drop].index
     
     return df[~df['case_id'].isin(drop_ids)]
     
 
-def fill_some_unknown(df):
-    isna_record = df.isna().sum()
-    feature_names = isna_record[isna_record > 0].index
-
-    low_cardinality_map = (df[feature_names].nunique() < 0.01 * df.case_id.nunique()).to_dict()
-    
-    for feature, low_flag in low_cardinality_map.items():
-        if low_flag:
-            df[feature] = df[feature].fillna("Unknown")
-        else:
-            print(f'{feature},', end=" ")
-            # freq = df[feature].value_counts()
-            # df[f'{feature}_freq'] = df[feature].map(freq)
-    return df
+def fill_missing(df, cols: list | str, keyword: str = "Unknown"):
+    """Fills the nan columns with `Unknown` (default) keyword"""
+    if type(cols) is str:
+        return df[[cols]].fillna("Unknown")
+    return df[cols].fillna("Unknown")
 
 def build_base_table(events_path: str = r'data\canonical\events.parquet', 
                      mbt_path: str = r'data\base_table\mbt.parquet'):
-    """function to create modeling ready base table
+    """Create feature engineering ready base table, feedable to model
 
     Args:
         path (str): Relative path from project root of canonical events data 
@@ -66,18 +44,35 @@ def build_base_table(events_path: str = r'data\canonical\events.parquet',
     df = load(events_path)
     grp_case = df.groupby('case_id')
     profile = load('configs/feature_profile.yaml')
+    tags = tag_feature_map(profile)
     
-    for feature in profile.get('sparse'):
-        df[f'{feature[:-2]}missing_flag']= build_flag(df[feature])
-        
-    df['contact_channel'] = make_constant(grp_case,'contact_channel')
-    df['reported_symptom_missing_flag'] = build_flag(df['reported_symptom'], missing_flags=False) # capture original missingness
-    df['reported_symptom'] = grp_case['reported_symptom'].transform('ffill')
-    df['reported_symptom'] = df['reported_symptom'].fillna('Unknown')
+    # highly-missing feature (99% missing)
+    sparse_cols = valid_cols(tags['sparse'], df)
+    df[add_suffix(sparse_cols, "pflag")] = build_flag(df[sparse_cols], 
+                                                          missing_flags=False)
+    df.drop(sparse_cols, axis=1, inplace=True)
     
+    # feature missing for few (<0.01%) cases
+    minor_missing_cols = valid_cols(tags['minor_missing'], df)
+    df = drop_missing(df, minor_missing_cols)
     
-    df = drop_few_missing(df)
-    df = fill_some_unknown(df)
+    # features missing for major (<5%) cases
+    major_null_cols = valid_cols(tags['major_null'], df)
+    cols_for_ffill = valid_cols(list(set(major_null_cols) - set(tags['uid'])), df)
+    
+    df[add_suffix(cols_for_ffill, "_mflag")] = build_flag(df[cols_for_ffill], missing_flags=True) # capture original missingness
+    df[cols_for_ffill] = make_constant(df, cols_for_ffill, 'ffill')
+    df[major_null_cols] = fill_missing(df, major_null_cols)
+    
+    # features missing for <1% cases
+    few_null_cols = valid_cols(tags['1pct_null'], df)
+    df[few_null_cols] = fill_missing(df, few_null_cols)
+    
+    # features <90% constant -> create constant proxy features
+    minor_changing_cols = valid_cols(list(set(tags['minor_change']) 
+                                          - set(tags['flag'])), df) # removed flag as it capture original data
+    cproxy_cols = add_suffix(minor_changing_cols, "_cproxy") #constant proxy cols
+    df[cproxy_cols] = make_constant(df, minor_changing_cols, "first") # only first can avoid data leakage
     
     print(f"saved modeling base table: {mbt_path}")
     return df
