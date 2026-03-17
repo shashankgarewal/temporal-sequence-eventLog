@@ -55,48 +55,50 @@ def build_base_table(events_path: str = r'data\canonical\events.parquet',
     profile = load('configs/feature_profile.yaml')
     tags = tag_feature_map(profile)
     
-    # preserve outcome variable from imputation
+    # ----------------- preserve outcome variable from imputation ---------------- #
     guardrail_cols = valid_cols(tags['guardrail'], df_raw)
     df = df_raw.drop(guardrail_cols, axis=1)
     outcome_df = df_raw[guardrail_cols]
     
-    # highly-missing feature (99% missing)
+    # ------------------- highly-missing feature (99% missing) ------------------- #
     sparse_cols = valid_cols(tags['sparse'], df)
     df[add_suffix(sparse_cols, "pflag", trim=2)] = build_flag(df[sparse_cols], 
                                                           missing_flags=False)
     df.drop(sparse_cols, axis=1, inplace=True)
     
-    # feature missing for few (<0.01%) cases
+    # ------------------ feature missing for few (<0.01%) cases ------------------ #
     minor_missing_cols = valid_cols(tags['minor_missing'], df)
     df = drop_missing(df, minor_missing_cols)
     
-    # features missing for major (<5%) cases
+    # ------------------ features missing for major (<5%) cases ------------------ #
     major_null_cols = valid_cols(tags['major_null'], df)
     
     cols_for_ffill = list(set(major_null_cols) - set(tags['uid'])) # removed uid columns
     cols_for_ffill = valid_cols(cols_for_ffill, df)
     
-    # avoiding ffill and mising flag on uid -> if they're null means its unknown or unassigned
-    df[add_suffix(cols_for_ffill, "_mflag")] = build_flag(df[cols_for_ffill], missing_flags=True) # capture original missingness
+    # ------------------- avoiding ffill and mising flag on uid ------------------ #
+    # -------------- if they're null means its unknown or unassigned ------------- #
+    df[add_suffix(cols_for_ffill, "_mflag")] = build_flag(df[cols_for_ffill], 
+                                                          missing_flags=True) # capture original missingness
     df[cols_for_ffill] = make_constant(df, cols_for_ffill, 'ffill')
     
     df[major_null_cols] = fill_missing(df, major_null_cols)
     
-    # features missing for <1% cases
+    # ---------------------- features missing for <1% cases ---------------------- #
     few_null_cols = valid_cols(tags['1pct_null'], df)
     df[few_null_cols] = fill_missing(df, few_null_cols)
     
-    # features <90% constant -> create constant proxy features
+    # --------- features <90% constant -> create constant proxy features --------- #
     minor_changing_cols = valid_cols(tags['minor_change'], df) # removed flag as it capture original data
     cproxy_cols = add_suffix(minor_changing_cols, "_cproxy") #constant proxy cols
     df[cproxy_cols] = make_constant(df, minor_changing_cols, "first") # only first can avoid data leakage
     
-    # ordinal feature encoding
+    # ------------------------- ordinal feature encoding ------------------------- #
     oridinal_cols = valid_cols(tags['ordinal'], df)
     df[add_suffix(oridinal_cols, "encoded", trim=5)] = apply_mappings(df, oridinal_cols, profile)
     df = df.drop(oridinal_cols, axis=1)
     
-    # bool feature to binary
+    # -------------------------- bool feature to binary -------------------------- #
     bool_cols = valid_cols(tags['boolean'], df)
     df[bool_cols] = df[bool_cols].astype(int) # True: 1, False: 0
     
