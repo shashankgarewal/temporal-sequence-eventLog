@@ -68,12 +68,11 @@ columns:
     note: 215 unique; null until resolved; forbidden as feature (leakage)
 
   resolution_id:
-    tags: [case_constant, categorical, guardrail]
+    tags: [case_constant, categorical, guardrail, 1pct_null]
     note: dropdown at resolution; forbidden as feature (leakage)
 
   updated_by_uid:
     tags: [event_level, categorical, mixed_scale]
-  # ------------------------ Lifecycle-null agent fields ----------------------- #
     note: 846 unique; mix of human agents and system accounts; needs threshold-based split
 
   # ── Minor-change columns (<5% cases vary) ──────────────────────
@@ -83,14 +82,27 @@ columns:
 
   urgency_level:
     tags: [minor_change, categorical, ordinal]
+    mapping:
+      "3 - Low":    1
+      "2 - Medium": 2
+      "1 - High":   3
     note: set by end-user; 299 cases changed; inspect directionality
 
   impact_level:
     tags: [minor_change, categorical, ordinal]
+    mapping:
+      "3 - Low":    1
+      "2 - Medium": 2
+      "1 - High":   3
     note: set by IT service desk; 315 cases changed
 
   priority_level:
     tags: [minor_change, categorical, ordinal, system_computed]
+    mapping:
+      "1 - Critical":  4
+      "2 - High":      3
+      "3 - Moderate":  2
+      "4 - Low":       1
     note: computed by ServiceNow from urgency+impact; round-trip changes observed
 
   category_id:
@@ -104,10 +116,6 @@ columns:
   reported_symptom:
     tags: [minor_change, categorical, high_cardinality, major_null]
     note: 5513 cases always null; ffill within case then Unknown; add missing_flag
-
-  reported_symptom_missing_flag:
-    tags: [derived, boolean, event_level]
-    note: flag before ffill; captures when symptom first entered the system
 
   contact_channel:
     tags: [minor_change, categorical]
@@ -152,6 +160,8 @@ columns:
     note: custom field; agent checked priority during assessment
 
   # ── Numeric interaction / derived ──────────────────────────────
+dervied:
+
   caused_by_change_pflag:
     tags: [flag, binary, minor_change, presense_flag]
 
@@ -169,6 +179,30 @@ columns:
 
   vendor_pflag:
     tags: [flag, binary, minor_change, presense_flag]
+
+  urgency_encoded:
+    tags: [minor_change, categorical, ordinal]
+    mapping:
+      1: "3 - Low"
+      2: "2 - Medium"
+      3: "1 - High"
+    note: set by end-user; 299 cases changed; inspect directionality
+
+  impact_encoded:
+    tags: [minor_change, categorical, ordinal]
+    mapping:
+      1: "3 - Low"
+      2: "2 - Medium"
+      3: "1 - High"
+    note: set by IT service desk; 315 cases changed
+
+  priority_encoded:
+    tags: [minor_change, categorical, ordinal, system_computed]
+    mapping:
+      4: "1 - Critical"
+      3: "2 - High"
+      2: "3 - Moderate"
+      1: "4 - Low"
 
   active_hours:
     tags: [event_level, numeric]
