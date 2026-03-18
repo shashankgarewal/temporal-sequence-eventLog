@@ -1,0 +1,18 @@
+v1:
+  - category
+  - priority_level
+  - assigned_team_id
+
+v2:
+  - category
+  - priority_level
+  - assigned_team_id
+  - event_number
+
+v3:
+  - category
+  - priority_level
+  - assigned_team_id
+  - event_number
+  - time_since_last_event
+

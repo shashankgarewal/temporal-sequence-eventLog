@@ -72,7 +72,7 @@ columns:
     note: dropdown at resolution; forbidden as feature (leakage)
 
   updated_by_uid:
-    tags: [event_level, categorical, mixed_scale]
+    tags: [event_level, categorical, mixed_scale, uid]
     note: 846 unique; mix of human agents and system accounts; needs threshold-based split
 
   # ── Minor-change columns (<5% cases vary) ──────────────────────
@@ -81,7 +81,7 @@ columns:
     note: True→False at resolution in all 208 varying cases; take first value
 
   urgency_level:
-    tags: [minor_change, categorical, ordinal]
+    tags: [minor_change, categorical, ordinal, case_attribute]
     mapping:
       "3 - Low":    1
       "2 - Medium": 2
@@ -89,7 +89,7 @@ columns:
     note: set by end-user; 299 cases changed; inspect directionality
 
   impact_level:
-    tags: [minor_change, categorical, ordinal]
+    tags: [minor_change, categorical, ordinal, case_attribute]
     mapping:
       "3 - Low":    1
       "2 - Medium": 2
@@ -97,7 +97,7 @@ columns:
     note: set by IT service desk; 315 cases changed
 
   priority_level:
-    tags: [minor_change, categorical, ordinal, system_computed]
+    tags: [minor_change, categorical, ordinal, system_computed, case_attribute]
     mapping:
       "1 - Critical":  4
       "2 - High":      3
@@ -106,11 +106,11 @@ columns:
     note: computed by ServiceNow from urgency+impact; round-trip changes observed
 
   category_id:
-    tags: [minor_change, categorical, minor_missing]
+    tags: [minor_change, categorical, minor_missing, case_attribute]
     note: 1184 cases changed; moderate cardinality
 
   subcategory_id:
-    tags: [minor_change, categorical, minor_missing]
+    tags: [minor_change, categorical, minor_missing, case_attribute]
     note: 1737 cases changed; child of category_id
 
   reported_symptom:
@@ -118,17 +118,17 @@ columns:
     note: 5513 cases always null; ffill within case then Unknown; add missing_flag
 
   contact_channel:
-    tags: [minor_change, categorical]
+    tags: [minor_change, categorical, case_attribute]
     impute: 'first'
     note: 5 cases changed (Self service→Phone, Email→Phone); channel escalation signal; take first + add escalation flag
 
   # ----------------------- Event-level sequence columns ----------------------- #
   case_status:
-    tags: [event_level, categorical]
+    tags: [event_level, categorical, case_state]
     note: primary state identifier; 100% of cases vary by definition
 
   is_open:
-    tags: [event_level, boolean]
+    tags: [event_level, boolean, case_state]
     note: derived from case_status; 100% vary
 
   system_update_count:
@@ -136,11 +136,11 @@ columns:
     note: tie-breaker for event ordering; monotonic within case
 
   reassignment_count:
-    tags: [event_level, counter, numeric]
+    tags: [event_level, counter, numeric, case_state]
     note: increments on both group AND analyst change; resets on reopen; use with reopen_count
 
   reopen_count:
-    tags: [event_level, counter, numeric]
+    tags: [event_level, counter, numeric, case_state]
     note: reassignment_count resets per reopen cycle
 
   assigned_team_gid:
@@ -152,11 +152,11 @@ columns:
     note: finer than reassignment_count (analyst swaps within group not counted); fill Unknown for ambiguous rows
 
   met_deadline:
-    tags: [event_level, boolean, guardrail, target]
+    tags: [event_level, boolean, guardrail, target, case_state]
     note: SLA met flag; primary classification target; forbidden as input feature
 
   priority_confirmed:
-    tags: [event_level, boolean]
+    tags: [event_level, boolean, case_attribute]
     note: custom field; agent checked priority during assessment
 
   # ── Numeric interaction / derived ──────────────────────────────
@@ -181,7 +181,7 @@ dervied:
     tags: [flag, binary, minor_change, presense_flag]
 
   urgency_encoded:
-    tags: [minor_change, categorical, ordinal]
+    tags: [minor_change, categorical, ordinal, case_attribute]
     mapping:
       1: "3 - Low"
       2: "2 - Medium"
@@ -189,7 +189,7 @@ dervied:
     note: set by end-user; 299 cases changed; inspect directionality
 
   impact_encoded:
-    tags: [minor_change, categorical, ordinal]
+    tags: [minor_change, categorical, ordinal, case_attribute]
     mapping:
       1: "3 - Low"
       2: "2 - Medium"
@@ -197,7 +197,7 @@ dervied:
     note: set by IT service desk; 315 cases changed
 
   priority_encoded:
-    tags: [minor_change, categorical, ordinal, system_computed]
+    tags: [minor_change, categorical, ordinal, system_computed, case_attribute]
     mapping:
       4: "1 - Critical"
       3: "2 - High"
