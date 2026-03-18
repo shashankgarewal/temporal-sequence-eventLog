@@ -1,19 +1,27 @@
+# staging.py
+"""Ingests raw source data and normalizes syntax — nulls, dtypes, and formats for downstream processing."""
+
 import pandas as pd
 import numpy as np
-import yaml
-from pathlib import Path
+from src.utils.load import load, dump
 
-ROOT = Path(__file__).resolve().parents[2]
-RAW  = ROOT / "data/raw/incident_event_log.csv"
-OUT  = ROOT / "data/staging/snapshots.parquet"
-SCHEMA = ROOT / "configs/schema.yaml"
+import logging
+logger = logging.getLogger(__name__)
 
-def main():
-    schema = yaml.safe_load(open(SCHEMA, "r", encoding="utf-8"))
+import warnings
+warnings.filterwarnings("ignore")
+
+def build_staging(raw_data_path = "data/raw/incident_event_log.csv", 
+                  snapshots_path = "data/staging/snapshots.parquet", 
+                  return_staged: bool = False
+                  ):
+    """Transform raw CSV into staged snapshots table."""
+    
+    logger.info("building staging snapshots...")
+    schema = load("configs/schema.yaml")
     schema_col = schema["raw_to_canonical"]
 
-    df = pd.read_csv(RAW)
-
+    df = load(raw_data_path)
     # "?" Unknown information with NaN
     df = df.replace(schema.get("missing_values", {}).get("token", "?"), np.nan)
 
@@ -43,9 +51,12 @@ def main():
         df[notify_email_col] = (df[notify_email_col] == 'Send Email').astype("boolean")
 
     # Save
-    Path(OUT).parent.mkdir(parents=True, exist_ok=True)
-    df.to_parquet(OUT, index=False)
-    print(f"staging saved at: {OUT.relative_to(ROOT)}")
+    dump(df, snapshots_path)
+    
+    if return_staged:
+        return df
+    return snapshots_path
 
 if __name__ == "__main__":
-    main()
+    #main()
+    pass

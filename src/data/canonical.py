@@ -11,7 +11,6 @@ import warnings
 warnings.filterwarnings('ignore')
 
 import logging
-logging.basicConfig(level=logging.INFO, format='%(message)s')
 logger = logging.getLogger(__name__)
 
 def build_canonical_events(snapshots_path: str = "data/staging/snapshots.parquet",

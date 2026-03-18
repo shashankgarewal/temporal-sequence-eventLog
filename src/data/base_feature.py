@@ -1,8 +1,14 @@
+# base_feature
+"""Transforms canonical data into feature-engineering-ready form for ML pipelines."""
+
 import pandas as pd
 import numpy as np
 from src.utils.load import load, dump
 from src.utils.data import tag_feature_map, add_suffix, valid_cols
-from typing import Dict, List, Any, Tuple
+from typing import Dict, List, Any
+
+import logging
+logger = logging.getLogger(__name__)
 
 def build_flag(data: pd.Series | pd.DataFrame, missing_flags: bool = True) -> pd.Series | pd.DataFrame:
     """Create data missing/presence flags of pandas series or dataframe"""
@@ -41,24 +47,26 @@ def apply_mappings(df: pd.DataFrame, cols: List[str], profile: Dict[str, Any]) -
             result[col] = df[col].map(mapping)
     return result
 
-def build_base_table(events_path: str = r'data\canonical\events.parquet', 
-                     mbt_path: str = r'data\base_table\mbt.parquet'):
-    """Create feature engineering ready base table, feedable to model
-
-    Args:
-        path (str): Relative path from project root of canonical events data 
-
-    Returns:
-        pd.DataFrame: data table ready to perform feature encoding for modeling
+def build_base_features(canonical_events_path: str = 'data/canonical/events.parquet',
+                        base_events_path: str = 'data/base_feature/events.parquet',
+                        return_events: bool = False
+                        ):
+    
     """
-    df_raw = load(events_path)
+    Create feature engineering ready base table, feedable to model
+        paths: relative to project root 
+        return: path of processed output
+    """
+    df_raw = load(canonical_events_path)
     profile = load('configs/feature_profile.yaml')
     tags = tag_feature_map(profile)
     
     # ----------------- preserve outcome variable from imputation ---------------- #
     guardrail_cols = valid_cols(tags['guardrail'], df_raw)
-    df = df_raw.drop(guardrail_cols, axis=1)
-    outcome_df = df_raw[guardrail_cols]
+    df = df_raw.drop(guardrail_cols, axis=1).copy()
+    outcome_df = df_raw[guardrail_cols].copy()
+    
+    logger.info("building base feature events...")
     
     # ----------------- ref. notebook section [Inspect uid cols] ----------------- #
     grouped = df['assigned_team_gid'].groupby([df['case_id'], df['reassignment_count']])
@@ -103,11 +111,14 @@ def build_base_table(events_path: str = r'data\canonical\events.parquet',
     df = df.drop(oridinal_cols, axis=1)
     
     # -------------------------- bool feature to binary -------------------------- #
-    bool_cols = valid_cols(tags['boolean'], df)
-    df[bool_cols] = df[bool_cols].astype(int) # True: 1, False: 0
+    bool_df = df.select_dtypes(bool).copy()
+    df[bool_df.columns] = bool_df.astype(int)
     
     
     df_combine = df.merge(outcome_df, left_index=True, right_index=True, how="left")
     
-    print(f"saved modeling base table: {mbt_path}")
-    return df_combine
+    dump(df_combine, base_events_path)
+    if return_events:
+        logger.info(f"saved base features with original outcome table: {base_events_path}")
+        return df_combine
+    return base_events_path
