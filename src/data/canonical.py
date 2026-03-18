@@ -10,6 +10,10 @@ from src.utils.load import load, dump
 import warnings
 warnings.filterwarnings('ignore')
 
+import logging
+logging.basicConfig(level=logging.INFO, format='%(message)s')
+logger = logging.getLogger(__name__)
+
 def build_canonical_events(snapshots_path: str = "data/staging/snapshots.parquet",
                            events_path: str = 'data/canonical/events.parquet', 
                            return_events: bool = False): 
@@ -27,7 +31,7 @@ def build_canonical_events(snapshots_path: str = "data/staging/snapshots.parquet
        df                   = load(snapshots_path)
        df                   = df.sort_values(['case_id'] + event_order, kind='mergesort')
 
-       print("building canonical events table")
+       logger.info("building canonical events table")
        # ------------------------------ fill created_at ----------------------------- #
        # from notebook analysis -> created_at is missing for all case events/entries when missing. 
 
@@ -170,9 +174,8 @@ def build_canonical_events(snapshots_path: str = "data/staging/snapshots.parquet
        dump(df, events_path)
        
        if return_events:
-              return events_path
-       else:
               return df
+       return events_path
 
 
 
