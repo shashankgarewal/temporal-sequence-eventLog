@@ -60,6 +60,10 @@ def build_base_table(events_path: str = r'data\canonical\events.parquet',
     df = df_raw.drop(guardrail_cols, axis=1)
     outcome_df = df_raw[guardrail_cols]
     
+    # ----------------- ref. notebook section [Inspect uid cols] ----------------- #
+    grouped = df['assigned_team_gid'].groupby([df['case_id'], df['reassignment_count']])
+    df['assigned_team_gid'] = grouped.transform('ffill').fillna(grouped.transform('bfill'))
+    
     # ------------------- highly-missing feature (99% missing) ------------------- #
     sparse_cols = valid_cols(tags['sparse'], df)
     df[add_suffix(sparse_cols, "pflag", trim=2)] = build_flag(df[sparse_cols], 
