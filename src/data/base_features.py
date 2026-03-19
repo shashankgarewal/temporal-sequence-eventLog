@@ -48,7 +48,7 @@ def apply_mappings(df: pd.DataFrame, cols: List[str], profile: Dict[str, Any]) -
     return result
 
 def build_base_features(canonical_events_path: str = 'data/canonical/events.parquet',
-                        base_events_path: str = 'data/base_feature/events.parquet',
+                        base_events_path: str = 'data/base_features/events.parquet',
                         return_events: bool = False
                         ):
     
