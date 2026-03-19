@@ -1,4 +1,4 @@
-# base_feature
+# base_features
 """Transforms canonical data into feature-engineering-ready form for ML pipelines."""
 
 import pandas as pd
