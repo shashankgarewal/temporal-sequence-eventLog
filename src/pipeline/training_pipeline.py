@@ -3,7 +3,7 @@
 
 from src.data.staging import build_staging
 from src.data.canonical import build_canonical_events
-from src.data.base_feature import build_base_features
+from src.data.base_features import build_base_features
 
 import warnings
 warnings.filterwarnings("ignore")

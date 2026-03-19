@@ -7,8 +7,8 @@ missing_values:
 parsing:
   timestamp_day_first: true
   event_order:
-    primary: update_timestamp
-    tie_breaker: system_update_count
+    - updated_at
+    - system_update_count
 
 raw_to_canonical:
   number: case_id
