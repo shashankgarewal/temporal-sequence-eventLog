@@ -4,6 +4,9 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 
+import logging
+logger = logging.getLogger(__name__)
+
 def _find_root() -> Path:
     # for package
     load_dotenv()
@@ -44,7 +47,7 @@ def load(path: str):
             case _:
                 raise ValueError(f"Unsupported file type: {ext}")
     except Exception as e:
-        print(f"Error loading file: {e}")
+        logger.info(f"Error loading file: {e}")
         raise e
     
     return obj
@@ -58,7 +61,7 @@ def dump(obj, path: str):
     try:
         loc.parent.mkdir(exist_ok=True, parents=True)
     except Exception as e:
-        print(f"Error creating directory: {e}")
+        logger.info(f"Error creating directory: {e}")
         raise e
 
     try:
@@ -75,8 +78,8 @@ def dump(obj, path: str):
             case _:
                 raise ValueError(f"Unsupported save format: {ext}")
                 
-        print(f"Successfully saved to: {loc}")        
+        logger.info(f"Successfully saved to: {path}")        
     except Exception as e:
-        print(f"Error saving file: {e}")
+        logger.info(f"Error saving file: {e}")
         raise e
     return
