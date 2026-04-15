@@ -209,10 +209,4 @@ dervied:
 
   time_since_last_update:
     tags: [event_level, numeric]
-
-targets:
-  sla_breach: 
-    tags: [classification, binary]
-
-  remanining_time:
-    tags: [regression]
+

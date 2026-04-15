@@ -1,0 +1,28 @@
+targets:
+  resolution_id:
+    type: classification
+    decision_trigger:
+      column: "case_status"
+      values: ["New"]
+    note: "Predict final resolution type at ticket creation (New)."
+
+  reopen_risk:
+    type: classification
+    decision_trigger:
+      column: "case_status"
+      values: ["Resolved", "Closed"]
+    note: "Predict if case will reopen when it is marked as Resolved or Closed."
+
+  sla_breach:
+    type: classification
+    decision_trigger:
+      column: "priority"
+      changed: true
+    note: "Predict SLA breach risk when priority is updated."
+
+  remaining_time:
+    type: regression
+    decision_trigger:
+      column: "case_status"
+      values: ["Awaiting User Info", "Awaiting Vendor", "Awaiting Problem", "Awaiting Evidence"]
+    note: "Predict remaining absolute time when ticket enters awaiting status."
