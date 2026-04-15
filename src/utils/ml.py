@@ -1,16 +1,22 @@
 import pandas as pd
 
-def time_aware_split(df, time_col, train_ratio=0.7, val_ratio=0.15):
+def time_aware_split(df: pd.DataFrame, train_ratio=0.75, val_ratio=0.15, case_col='case_id'):
+    """
+    Split event log dataframe chronologically by case.
+    """
 
-    df = df.sort_values(time_col)
-
-    n = len(df)
+    ordered_case_ids = df[case_col].unique()
+    n = len(ordered_case_ids)
 
     train_end = int(n * train_ratio)
     val_end = int(n * (train_ratio + val_ratio))
 
-    train = df.iloc[:train_end]
-    val   = df.iloc[train_end:val_end]
-    test  = df.iloc[val_end:]
+    train_ids = set(ordered_case_ids[:train_end])
+    val_ids = set(ordered_case_ids[train_end:val_end])
+    test_ids = set(ordered_case_ids[val_end:])
+
+    train = df[df[case_col].isin(train_ids)].copy()
+    val = df[df[case_col].isin(val_ids)].copy()
+    test = df[df[case_col].isin(test_ids)].copy()
 
     return train, val, test
